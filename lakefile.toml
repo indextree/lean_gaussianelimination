@@ -1,0 +1,16 @@
+name = "lean_gaussianelimination"
+version = "0.1.0"
+defaultTargets = ["lean_gaussianelimination"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.26.0"
+
+[[lean_lib]]
+name = "LeanGaussianelimination"
+
+[[lean_exe]]
+name = "lean_gaussianelimination"
+root = "Main"
