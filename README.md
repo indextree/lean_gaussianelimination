@@ -84,11 +84,11 @@ This means the result is mathematically guaranteed to be correct!
 │                         │    │                                 │
 │  • GaussCert structure  │    │  • ElemOp type                  │
 │  • gaussianElim         │    │  • gaussianElimWithTrace        │
-│  • GaussFactor          │    │  • Step-by-step execution       │
-│  • Proofs via Mathlib   │    │  • IO printing functions        │
-│                         │    │                                 │
-│  (Noncomputable -       │    │  (Computable - runs and         │
-│   proves correctness)   │    │   shows actual operations)      │
+│  • GaussFactor          │    │  • gaussianElimWithTrace_spec   │
+│  • Proofs via Mathlib   │    │  • gaussianElimComputable       │
+│                         │    │  • Step-by-step execution       │
+│  (Noncomputable -       │    │  (Computable & formally proven  │
+│   Mathlib witness)      │    │   correct for any matrix)       │
 └─────────────────────────┘    └─────────────────────────────────┘
           │                                 │
           └────────────────┬────────────────┘
@@ -107,7 +107,7 @@ This means the result is mathematically guaranteed to be correct!
 
 #### 1. Verified Implementation (`LeanGaussianelimination.lean`)
 
-This file provides the **mathematically verified** version:
+This file provides the **mathematically verified** certificate structures and Mathlib witness extraction:
 
 ```lean
 -- Certificate structure: contains the result AND its proof
@@ -124,11 +124,9 @@ noncomputable def gaussianElim (M : Matrix n n K) : GaussCert M :=
   ...
 ```
 
-**Why noncomputable?** Mathlib proves that transvections *exist* but doesn't compute them explicitly. We use `Classical.choose` to extract these witnesses, which is non-constructive.
+#### 2. Computable & Formally Verified Implementation (`Computable.lean`)
 
-#### 2. Computable Implementation (`Computable.lean`)
-
-This file provides the **executable** version with trace output:
+This file provides the **executable** version with trace output AND formal proofs (`gaussianElimWithTrace_spec`, `gaussianElimComputable`, `gaussianFactorComputable`) connecting it to `GaussCert` and `GaussFactor` for any general matrix:
 
 ```lean
 -- Elementary operation type
@@ -148,17 +146,32 @@ def applyOp (M : Matrix (Fin n) (Fin n) K) : ElemOp n K → Matrix (Fin n) (Fin 
 gaussElimLoop(M, k, ops):
   if k ≥ n: return (ops, M)
   
-  pivot ← findPivot(M, column=k, startRow=k)
-  if pivot is None: 
-    return gaussElimLoop(M, k+1, ops)  // Skip column
+  pivotRow ← findPivot(M, column=k, startRow=k)
+  if pivotRow is None:
+    pivotCol ← findRowPivot(M, row=k, startCol=k)
+    if pivotCol is None:
+      return gaussElimLoop(M, k+1, ops)  // Row and column k already zero
+    // Move non-zero entry in row k into (k, k) via column operation
+    prepOp ← addCol(k, pivotCol, 1)
+    M0 ← applyOp(M, prepOp)
+    (colOps, M')  ← eliminateColumn(M0, k, k)
+    (rowOps, M'') ← eliminateRow(M', k, k)
+    return gaussElimLoop(M'', k+1, ops ++ [prepOp] ++ colOps ++ rowOps)
+
+  if pivotRow ≠ k:
+    // Move non-zero entry in column k into (k, k) via row operation
+    prepOp ← addRow(k, pivotRow, 1)
+    M0 ← applyOp(M, prepOp)
+  else:
+    M0 ← M
   
-  // Eliminate all other entries in column k
-  (colOps, M') ← eliminateColumn(M, pivotRow, k)
+  // Eliminate all other entries in column k using row k as pivot
+  (colOps, M') ← eliminateColumn(M0, k, k)
   
-  // Eliminate all other entries in row k  
+  // Eliminate all other entries in row k using column k as pivot
   (rowOps, M'') ← eliminateRow(M', k, k)
   
-  return gaussElimLoop(M'', k+1, ops ++ colOps ++ rowOps)
+  return gaussElimLoop(M'', k+1, ops ++ prepOps ++ colOps ++ rowOps)
 ```
 
 #### 3. How Operations Are Recorded

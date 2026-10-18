@@ -4,18 +4,30 @@ import LeanGaussianelimination.Computable
 open VerifiedGaussianElimination
 open VerifiedGaussianElimination.Computable
 
--- Example: Verify Gaussian elimination on a 2x2 matrix over ℚ
+-- Example: Verify Gaussian elimination on a 2x2 matrix over ℚ (noncomputable Mathlib witness)
 noncomputable example : GaussCert (n := Fin 2) (K := ℚ) !![1, 2; 3, 4] :=
   gaussianElim !![1, 2; 3, 4]
+
+-- Computable verified certificate directly from `gaussianElimWithTrace`:
+example : GaussCert (n := Fin 2) (K := ℚ) !![1, 2; 3, 4] :=
+  gaussianElimComputable !![1, 2; 3, 4]
+
+-- Computable verified certificate when M[0,0] = 0 (requires pivot row change):
+example : GaussCert (n := Fin 3) (K := ℚ) !![0, 2, 3; 4, 5, 6; 7, 8, 10] :=
+  gaussianElimComputable !![0, 2, 3; 4, 5, 6; 7, 8, 10]
 
 -- The theorem states that for ANY matrix M:
 -- there exist transvections L, L' and diagonal D such that
 -- (∏L) * M * (∏L') = diagonal D
 #check @gaussianElim_spec
+#check @gaussianElimWithTrace_spec
 
 -- Alternative factorization form: M = (∏L) * diagonal D * (∏L')
 noncomputable example : GaussFactor (n := Fin 2) (K := ℚ) !![1, 2; 3, 4] :=
   gaussianFactor !![1, 2; 3, 4]
+
+example : GaussFactor (n := Fin 2) (K := ℚ) !![1, 2; 3, 4] :=
+  gaussianFactorComputable !![1, 2; 3, 4]
 
 def main : IO Unit := do
   IO.println "=== Verified Gaussian Elimination ==="
@@ -31,6 +43,12 @@ def main : IO Unit := do
   IO.println "3×3 Matrix Example"
   IO.println "────────────────────────────────────"
   exampleRun
+  IO.println ""
+
+  IO.println "────────────────────────────────────"
+  IO.println "3×3 Matrix Example (Pivot Row Change)"
+  IO.println "────────────────────────────────────"
+  examplePivotSwap
   IO.println ""
 
   IO.println "────────────────────────────────────"
