@@ -223,11 +223,15 @@ Output: ops = [addRow(1,0,-3), addCol(1,0,-2)]
 
 ```
 lean_gaussianelimination/
-├── LeanGaussianelimination.lean      # Verified (noncomputable) implementation
+├── LeanGaussianelimination.lean      # Verified certificate structures & Mathlib witnesses
 ├── LeanGaussianelimination/
 │   ├── Basic.lean                    # Basic definitions
-│   └── Computable.lean               # Executable implementation with trace
-├── Main.lean                         # Entry point with examples
+│   └── Computable.lean               # Executable implementation, trace & formal proofs
+├── Main.lean                         # CLI entry point (built-in examples & custom inputs)
+├── script/
+│   ├── fuzz_test.py                  # Differential fuzz test & oracle verifier over ℚ
+│   ├── run_fuzz.sh                   # Shell runner for fuzz tests & custom inputs
+│   └── sample_matrices.txt           # Sample custom matrix inputs
 ├── lakefile.toml                     # Build configuration
 └── lean-toolchain                    # Lean version specification
 ```
@@ -276,9 +280,37 @@ lean_gaussianelimination/
    lake build
    ```
 
-4. **Run the examples**:
+4. **Run the built-in examples**:
    ```bash
    lake exe lean_gaussianelimination
+   ```
+
+5. **Run with custom matrix inputs**:
+   ```bash
+   # JSON / nested list format
+   lake exe lean_gaussianelimination "[[0, 2, 3], [4, 5, 6], [7, 8, 10]]"
+
+   # Semicolon-separated rows (supports integers and rational fractions a/b)
+   lake exe lean_gaussianelimination "0, 1/2; -3/4, 0"
+
+   # Lean matrix notation
+   lake exe lean_gaussianelimination "!![0, 1; 1, 0]"
+
+   # Read multiple matrices from a file or stdin
+   lake exe lean_gaussianelimination --file script/sample_matrices.txt
+   ```
+
+6. **Run the Fuzz Test Framework (`script/`)**:
+   ```bash
+   # Run default fuzz suite (deterministic edge cases + 200 random matrices)
+   ./script/run_fuzz.sh
+
+   # Customize test count, maximum matrix size, and seed
+   ./script/run_fuzz.sh --num-tests 500 --max-size 7 --seed 42
+
+   # Run and oracle-verify custom matrices via the test harness
+   ./script/run_fuzz.sh --matrix "[[0, 2, 3], [4, 5, 6], [7, 8, 10]]"
+   ./script/run_fuzz.sh --file script/sample_matrices.txt
    ```
 
 ### Expected Output

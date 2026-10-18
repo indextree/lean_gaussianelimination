@@ -826,6 +826,80 @@ def runGaussianElim [Field K] [DecidableEq K] [Repr K] (M : Matrix (Fin n) (Fin 
   IO.println ""
   printMatrix trace.finalMatrix "Final Matrix"
 
+/-!
+## Custom Input Parsing (Matrices over `ℚ`)
+-/
+
+/-- Strip outer characters such as whitespace, parentheses, `+`, or `: Rat`. -/
+def cleanToken (s : String) : String :=
+  let s := s.replace ": Rat" ""
+  String.ofList (s.toList.filter (fun c => c != '(' && c != ')' && c != '+' && !c.isWhitespace))
+
+/-- Parse a rational number `ℚ` from a string (e.g. `"4"`, `"-3"`, `"-7/4"`). -/
+def parseRat (s : String) : Option ℚ :=
+  let s := s.trim
+  if s.isEmpty then none
+  else
+    match s.splitOn "/" with
+    | [numStr] =>
+      let cleaned := cleanToken numStr
+      cleaned.toInt?.map (fun num => (num : ℚ))
+    | [numStr, denStr] =>
+      let cNum := cleanToken numStr
+      let cDen := cleanToken denStr
+      match cNum.toInt?, cDen.toInt? with
+      | some num, some den =>
+        if den == 0 then none else some ((num : ℚ) / (den : ℚ))
+      | _, _ => none
+    | _ => none
+
+/-- Clean a row chunk by removing `[`, `]`, `!`, leading/trailing commas, and whitespace. -/
+def cleanRowChunk (s : String) : String :=
+  let filtered := String.ofList (s.toList.filter (fun c => c != '[' && c != ']' && c != '!'))
+  filtered.trim.dropWhile (fun c => c == ',' || c.isWhitespace)
+    |>.dropRightWhile (fun c => c == ',' || c.isWhitespace)
+
+/-- Parse a matrix string in any standard format:
+    - JSON / Python list format: `"[[0, 2, 3], [4, 5, 6], [7, 8, 10]]"`
+    - Lean matrix format: `"!![0, 2, 3; 4, 5, 6; 7, 8, 10]"`
+    - Semicolon-separated rows: `"0, 2, 3; 4, 5, 6; 7, 8, 10"` or `"0 2 3; 4 5 6; 7 8 10"`
+    - Multi-line matrix text with space- or comma-separated entries -/
+def parseMatrixRows (input : String) : Except String (List (List ℚ)) := do
+  let rawChunks := input.splitToList (fun c => c == ';' || c == '\n' || c == ']')
+  let rowStrings := rawChunks.map cleanRowChunk |>.filter (fun r => !r.isEmpty)
+  if rowStrings.isEmpty then
+    throw "Empty matrix input"
+  let mut rows : List (List ℚ) := []
+  for rStr in rowStrings do
+    let tokens :=
+      if rStr.contains ',' then
+        rStr.splitOn "," |>.map String.trim |>.filter (fun t => !t.isEmpty)
+      else
+        rStr.splitToList Char.isWhitespace |>.map String.trim |>.filter (fun t => !t.isEmpty)
+    let mut rowVals : List ℚ := []
+    for tok in tokens do
+      match parseRat tok with
+      | some q => rowVals := rowVals ++ [q]
+      | none => throw s!"Invalid rational number entry: '{tok}'"
+    rows := rows ++ [rowVals]
+  let n := rows.length
+  for r in rows do
+    if r.length != n then
+      throw s!"Matrix must be square: found {n} rows, but a row has {r.length} entries"
+  return rows
+
+/-- Parse a custom matrix over `ℚ` and run `runGaussianElim` on it. -/
+def runCustomMatrix (input : String) : IO Bool := do
+  match parseMatrixRows input with
+  | .error err =>
+    IO.eprintln s!"Error parsing matrix: {err}"
+    return false
+  | .ok rows =>
+    let n := rows.length
+    let M : Matrix (Fin n) (Fin n) ℚ := fun i j => (rows.getD i.val []).getD j.val 0
+    runGaussianElim M
+    return true
+
 /-- Example: Run on a concrete 3x3 matrix over ℚ -/
 def exampleRun : IO Unit := do
   -- Define a 3x3 matrix over ℚ
